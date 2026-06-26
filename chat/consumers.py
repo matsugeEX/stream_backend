@@ -3,18 +3,20 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
-    connected_count = 0
+    connected_counts = {}
 
     async def connect(self):
-        self.room_name = "test_room"
+        self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
         self.room_group_name = f"chat_{self.room_name}"
 
-        await self.channel_layer.group_add(        #group_add(group_name, channel_name) <- ある channel（接続）を、指定した group に所属させる処理
-            self.room_group_name,                  #第一引数 = グループ名, 第二引数 = 個々の接続を識別する一意ID
+        await self.channel_layer.group_add(
+            self.room_group_name,
             self.channel_name,
         )
 
-        ChatConsumer.connected_count += 1
+        ChatConsumer.connected_counts[self.room_name] = (
+            ChatConsumer.connected_counts.get(self.room_name, 0) + 1
+        )
 
         await self.accept()
 
@@ -22,7 +24,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             {
                 "type": "viewer_update",
-                "count": ChatConsumer.connected_count,
+                "count": ChatConsumer.connected_counts[self.room_name],
             },
         )
 
@@ -32,13 +34,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.channel_name,
         )
 
-        ChatConsumer.connected_count -= 1
+        ChatConsumer.connected_counts[self.room_name] -= 1
+
+        if ChatConsumer.connected_counts[self.room_name] <= 0:
+            del ChatConsumer.connected_counts[self.room_name]
+
+        count = ChatConsumer.connected_counts.get(self.room_name, 0)
 
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 "type": "viewer_update",
-                "count": ChatConsumer.connected_count,
+                "count": count,
             },
         )
 
