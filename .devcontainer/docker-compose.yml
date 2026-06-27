@@ -1,0 +1,11 @@
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/python:3-3.14-trixie
+    volumes:
+      - ..:/workspace:cached
+    command: sleep infinity
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
