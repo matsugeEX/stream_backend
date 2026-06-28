@@ -56,15 +56,46 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         data = json.loads(text_data)
-        message = data["message"]
+        message_type = data.get("type")
 
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                "type": "chat_message",
-                "message": message,
-            },
-        )
+        if message_type == "chat":
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "chat_message",
+                    "message": data["message"],
+                },
+            )
+
+        elif message_type == "webrtc_offer":
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "webrtc_offer",
+                    "sdp": data["sdp"],
+                    "sender_channel_name": self.channel_name,
+                },
+            )
+
+        elif message_type == "webrtc_answer":
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "webrtc_answer",
+                    "sdp": data["sdp"],
+                    "sender_channel_name": self.channel_name,
+                },
+            )
+
+        elif message_type == "webrtc_candidate":
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "webrtc_candidate",
+                    "candidate": data["candidate"],
+                    "sender_channel_name": self.channel_name,
+                },
+            )
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps({
@@ -76,4 +107,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             "type": "viewer_count",
             "count": event["count"],
+        }))
+    
+    async def webrtc_offer(self, event):
+        if event["sender_channel_name"] == self.channel_name:
+            return
+
+        await self.send(
+            text_data=json.dumps({
+                "type": "webrtc_offer",
+                "sdp": event["sdp"],
+            })
+        )
+
+
+    async def webrtc_answer(self, event):
+        if event["sender_channel_name"] == self.channel_name:
+            return
+        await self.send(text_data=json.dumps({
+            "type": "webrtc_answer",
+            "sdp": event["sdp"],
+        }))
+
+
+    async def webrtc_candidate(self, event):
+        if event["sender_channel_name"] == self.channel_name:
+            return
+        await self.send(text_data=json.dumps({
+            "type": "webrtc_candidate",
+            "candidate": event["candidate"],
         }))
